@@ -3,7 +3,7 @@
 #include <numbers>
 #include <fstream>
 #include <string>
-
+#include <iomanip>
 
 // Analytical function
 double analiticF(double x,double t)
@@ -84,14 +84,14 @@ double L1norm(Vector eps)
 
     int N = eps.size();
 
-    for (size_t i = 0; i < eps.size()-1; i++)
+    for (size_t i = 0; i < N; i++)
     {
      
         norm += std::fabs(eps[i]); 
 
     }
     
-    norm = norm/(N-1);
+    norm = norm/(N);
 
     return norm;
 
@@ -104,14 +104,14 @@ double L2norm(Vector eps)
 
     int N = eps.size();
 
-    for (size_t i = 0; i < eps.size()-1; i++)
+    for (size_t i = 0; i < N; i++)
     {
      
         norm += eps[i]*eps[i]; 
 
     }
 
-    norm = norm/(N-1);
+    norm = norm/(N);
 
     norm = std::sqrt(norm);
 
@@ -239,7 +239,9 @@ int main(){
     double gamma2 = 1.0/6.0;    
     double gamma3 = 1.0/100.0;
 
-    double delX = (2.0*pi)/16.0;
+    std::vector<double> gammas = {gamma1,gamma2,gamma3};
+
+    double delX = (2.0*pi)/64.0;
 
     double delT1 = gamma1*delX*delX;
     double delT2 = gamma2*delX*delX;
@@ -253,15 +255,15 @@ int main(){
 
     std::vector<double> delTs = {delT1,delT2,delT3};
 
-    size_t numPoints = 2*pi/delX + 1;
+    size_t numPoints = (2*pi)/delX + 1;
 
     Vector eps(numPoints);
     
     Vector u(numPoints);
+
     Matrix A(numPoints,numPoints);
 
     Vector uLast(numPoints);
-    Vector uAtTime1(numPoints);
 
     Vector uAnalyticFE1(numPoints); // store three analytic solutions as depend on final t so how runs are made influences each
     Vector uAnalyticFE2(numPoints);
@@ -282,11 +284,15 @@ int main(){
     bool flagSteadyState = 0;
 
     size_t iter = 0;
-    size_t maxIter = 5000;
+    size_t maxIter = 500000;
 
     u = IC(delX,numPoints); //IC function takes delX and numPoints as first and second input (same for u1,u2,u3 only delT changes)
 
-    Vector uAt1(numPoints);
+    Vector uAt1(numPoints); // used to find L1 and L2 norms for part b) at time close to or equal t=1 second
+
+    double tCrit = 0.0; //stores the value of the time at which u for the norm calculations is written
+
+    double tReachedByAllPartb = 1.00238; //not sure why but this value seems to be great to evaluate around as all three different gammas pass through with least deviation
 
     //For forward euler
     for (size_t i = 0; i < 3; i++)
@@ -300,13 +306,17 @@ int main(){
             for (size_t j = 0; j < numPoints; j++)
             {
 
-                u[j] = fEuler(u,delX,delTs[i],j,numPoints);
+                u[j] = fEuler(uLast,delX,delTs[i],j,numPoints);
 
             }
+
+            t += delTs[i];
             
-            if (0.0095<=t && t<=1.0005)
+            if (tReachedByAllPartb - 0.000005<=t && t<=tReachedByAllPartb + 0.000005)
             {
                 uAt1 = u;
+                std::cout<<std::setprecision(15)<<"Part b) FE for gamma"<<gammas[i]<<" written at t = "<<t<<" ,delT = "<<delTs[i]<<std::endl;
+                tCrit = t;
             }
 
             iter += 1;
@@ -315,8 +325,6 @@ int main(){
             {
                 flagSteadyState = 1;
             }
-
-            t += delTs[i];
 
         }
         // Store and reset u for next run
@@ -328,7 +336,7 @@ int main(){
         for (size_t k = 0; k < numPoints; k++)
         {
         
-            (*analyticSols[i])[k] = analiticF(k*delX,t);
+            (*analyticSols[i])[k] = analiticF(k*delX,tCrit);
         
         }
         
@@ -353,9 +361,13 @@ int main(){
             Vector rhs = u * (1.0/delTs[i]);
             u = bEuler(rhs,A);
 
-            if (0.0095<=t && t<=1.0005)
+            t += delTs[i];
+
+            if (tReachedByAllPartb - 0.000005<=t && t<=tReachedByAllPartb + 0.000005)
             {
                 uAt1 = u;
+                std::cout<<std::setprecision(15)<<"Part b) BE for gamma"<<gammas[i]<<" written at t = "<<t<<" ,delT = "<<delTs[i]<<std::endl;
+                tCrit = t;
             }
             
             iter += 1;
@@ -364,8 +376,6 @@ int main(){
             {
                 flagSteadyState = 1;
             }
-
-            t += delTs[i];
 
         }
         // Store and reset u for next run
@@ -377,7 +387,7 @@ int main(){
         for (size_t k = 0; k < numPoints; k++)
         {
         
-            (*analyticSols[i+3])[k] = analiticF(k*delX,t);
+            (*analyticSols[i+3])[k] = analiticF(k*delX,tCrit);
         
         }
         eps = *analyticSols[i+3] - uAt1;
@@ -403,10 +413,14 @@ int main(){
             U = initializeUvecCN(u,delX,delTs[i]);
 
             u = bEuler(U,A);
+
+            t += delTs[i];
             
-            if (0.0095<=t && t<=1.0005)
+            if (tReachedByAllPartb - 0.000005<=t && t<=tReachedByAllPartb + 0.000005)
             {
                 uAt1 = u;
+                std::cout<<std::setprecision(15)<<"Part b) CN for gamma"<<gammas[i]<<" written at t = "<<t<<" ,delT = "<<delTs[i]<<std::endl;
+                tCrit = t;
             }
 
             iter += 1;
@@ -415,8 +429,6 @@ int main(){
             {
                 flagSteadyState = 1;
             }
-
-            t += delTs[i];
 
         }
         // Store and reset u for next run
@@ -428,7 +440,7 @@ int main(){
         for (size_t k = 0; k < numPoints; k++)
         {
         
-            (*analyticSols[i+6])[k] = analiticF(k*delX,t);
+            (*analyticSols[i+6])[k] = analiticF(k*delX,tCrit);
         
         }
         eps = *analyticSols[i+6] - uAt1;
@@ -441,7 +453,7 @@ int main(){
 
     //part c)
 
-    double delT = 0.001;
+    double delT = 0.0001;
 
     double delX1 = (2.0*pi)/64.0;
     double delX2 = (2.0*pi)/128.0;
@@ -474,6 +486,7 @@ int main(){
     Vector epsAtnp3(numPoints3);
 
     std::vector<Vector*> uAt1diffNp = {&uAt1np1,&uAt1np2,&uAt1np3};
+
     std::vector<Vector*> epsAtdiffNp = {&epsAtnp1,&epsAtnp2,&epsAtnp3};
 
     std::vector<Vector*> analyticSols2 = {&uAnalyticFE4,&uAnalyticFE5,&uAnalyticFE6,
@@ -494,23 +507,24 @@ int main(){
             for (size_t j = 0; j < allNumPoints[i]; j++)
             {
 
-                u[j] = fEuler(u,delXs[i],delT,j,allNumPoints[i]);
+                u[j] = fEuler(uLast,delXs[i],delT,j,allNumPoints[i]);
 
             }
 
-            if (0.0095<=t && t<=1.0005)
-            {
-                *uAt1diffNp[i] = u;
-            }
-            
             iter += 1;
 
+            t += delT;
+
+            if (iter == 10000)
+            {
+                *uAt1diffNp[i] = u;
+                std::cout<<std::setprecision(15)<<"Part c) FE for delX = "<<delXs[i]<<" written at t = "<<t<<" ,delT = "<<delT<<std::endl;
+            }
+            
             if (uLast == u)
             {
                 flagSteadyState = 1;
             }
-
-            t += delT;
 
         }
         // Store and reset u for next run
@@ -520,7 +534,7 @@ int main(){
         flagSteadyState = 0;
         for (size_t k = 0; k < allNumPoints[i]; k++)
         {
-            (*analyticSols2[i])[k] = analiticF(k*delXs[i],t);
+            (*analyticSols2[i])[k] = analiticF(k*delXs[i],1.0);
         }
         *epsAtdiffNp[i] = *analyticSols2[i] - *uAt1diffNp[i];
         L1normTimesTimeT1.push_back(L1norm(*epsAtdiffNp[i]));
@@ -546,20 +560,22 @@ int main(){
 
             Vector rhs = u * (1.0/delT);
             u = bEuler(rhs,A);
-            
-            if (0.0095<=t && t<=1.0005)
-            {
-                *uAt1diffNp[i] = u;
-            }
 
             iter += 1;
+            
+            t += delT;
+
+            if (iter == 10000)
+            {
+                *uAt1diffNp[i] = u;
+                std::cout<<std::setprecision(15)<<"Part c) BE for delX = "<<delXs[i]<<" written at t = "<<t<<" ,delT = "<<delT<<std::endl;
+            }
 
             if (uLast == u)
             {
                 flagSteadyState = 1;
             }
 
-            t += delT;
         }
         // Store and reset u for next run
         hist.push_back(u);
@@ -568,7 +584,7 @@ int main(){
         flagSteadyState = 0;
         for (size_t k = 0; k < allNumPoints[i]; k++)
         {
-            (*analyticSols2[i+3])[k] = analiticF(k*delXs[i],t);
+            (*analyticSols2[i+3])[k] = analiticF(k*delXs[i],1.0);
         }
         *epsAtdiffNp[i] = *analyticSols2[i+3] - *uAt1diffNp[i];
         L1normTimesTimeT1.push_back(L1norm(*epsAtdiffNp[i]));
@@ -598,19 +614,21 @@ int main(){
 
             u = bEuler(U,A);
 
-            if (0.0095<=t && t<=1.0005)
-            {
-                *uAt1diffNp[i] = u;
-            }
-            
             iter += 1;
 
+            t += delT;
+
+            if (iter == 10000)
+            {
+                *uAt1diffNp[i] = u;
+                std::cout<<std::setprecision(15)<<"Part c) CN for delX = "<<delXs[i]<<" written at t = "<<t<<" ,delT = "<<delT<<std::endl;
+            }
+            
             if (uLast == u)
             {
                 flagSteadyState = 1;
             }
 
-            t += delT;
         }
         // Store and reset u for next run
         hist.push_back(u);
@@ -620,7 +638,7 @@ int main(){
         flagSteadyState = 0;
         for (size_t k = 0; k < allNumPoints[i]; k++)
         {
-            (*analyticSols2[i+6])[k] = analiticF(k*delXs[i],t);
+            (*analyticSols2[i+6])[k] = analiticF(k*delXs[i],1.0);
         }
         *epsAtdiffNp[i] = *analyticSols2[i+6] - *uAt1diffNp[i];
         L1normTimesTimeT1.push_back(L1norm(*epsAtdiffNp[i]));
